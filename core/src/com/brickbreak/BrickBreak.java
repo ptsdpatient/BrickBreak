@@ -8,20 +8,24 @@ import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.TextureArray;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ScreenUtils;
+import com.badlogic.gdx.utils.viewport.ExtendViewport;
+
 import java.util.Objects;
 
 public class BrickBreak extends ApplicationAdapter {Sound levelSound;
 	SpriteBatch batch;
 	Texture verticalWallTexture,horizontalWallTexture,ballTexture,plateTexture,brickTexture,hudTexture,sceneTexture,flakeTexture;
 	float movePlayer=0f,delta=0f,playerSpeed=2f;
-	int life=5,level=1,sceneIndex=-1,score=0;
+	int life=5,level=1,sceneIndex=0,score=0;
 	private BitmapFont levelFont,lifeFont,scoreFont;
 	Sprite player;
 	String[] ballName={"ball1.png","ball2.png","ball3.png"};
@@ -32,7 +36,10 @@ public class BrickBreak extends ApplicationAdapter {Sound levelSound;
 	Array<Ball> ballArray = new Array<Ball>();
 	Array<Brick> brickArray = new Array<Brick>();
 	Array<Flake> flakeArray = new Array<Flake>();
+	Array<Texture> sceneTextureArray = new Array<Texture>();
 	OrthographicCamera camera = new OrthographicCamera();
+	ExtendViewport viewport = new ExtendViewport(400, 550, camera);
+
 
 	public class Wall{
 		private float x,y;
@@ -158,13 +165,13 @@ public class BrickBreak extends ApplicationAdapter {Sound levelSound;
 	}
 	public void initializeBricks(){
 		levelSound.play();
+
 		for(Flake flake : flakeArray){
 			flakeArray.removeValue(flake,true);
 		}
-		if(level%7==0){
-			if(sceneIndex<8)sceneTexture=new Texture(sceneName[sceneIndex+1]);
-			sceneIndex++;
-		}
+
+		if(level%3==0 && sceneIndex<8)sceneIndex++;
+		sceneTexture=sceneTextureArray.get(sceneIndex);
 		int column = MathUtils.random(3,10);
 		for(int i =0;i<6;i++){
 			for(int j =0;j<column;j++){
@@ -193,20 +200,28 @@ public class BrickBreak extends ApplicationAdapter {Sound levelSound;
 	}
 
 	@Override
+	public void resize(int width, int height) {
+		viewport.update(width, height, true);
+	}
+	@Override
 	public void create () {
-		Gdx.graphics.setWindowedMode(400,550);
+		//Gdx.graphics.setWindowedMode(400,550);
 		camera.setToOrtho(false,400,550);
+
 		Gdx.input.setInputProcessor(ip);
 		Gdx.graphics.setResizable(false);
 		batch = new SpriteBatch();
 		flakeTexture= new Texture("flakes.png");
-		sceneTexture = new Texture("scene1.png");
 		hudTexture=new Texture("hud.png");
 		verticalWallTexture=new Texture("vertical.png");
 		horizontalWallTexture=new Texture("horizontal.png");
 		ballTexture=new Texture(ballName[MathUtils.random(0,ballName.length-1)]);
+
 		levelSound=Gdx.audio.newSound(Gdx.files.internal("level.mp3"));
 
+		for(String textureName :sceneName ){
+			sceneTextureArray.add(new Texture(textureName));
+		}
 
 		levelFont = new BitmapFont();
 		levelFont.setColor(Color.YELLOW);
@@ -217,6 +232,7 @@ public class BrickBreak extends ApplicationAdapter {Sound levelSound;
 		scoreFont = new BitmapFont();
 		scoreFont.setColor(Color.CYAN);
 		scoreFont.getData().setScale(2.5f);
+
 		Wall upperWall = new Wall(0,480,"up");
 		Wall downWall = new Wall(0,0,"down");
 		Wall leftWall = new Wall(0,0,"left");
@@ -235,11 +251,13 @@ public class BrickBreak extends ApplicationAdapter {Sound levelSound;
 
 	@Override
 	public void render () {
-		ScreenUtils.clear(1, 0, 0, 1);
+		ScreenUtils.clear(0, 0 ,0, 1);
 		if(life<1)Gdx.app.exit();
 		if(brickArray.isEmpty()){level++;ballArray.removeRange(0,ballArray.size-1);initializeBricks();}
 		camera.update();
+		camera.position.set(400 / 2f,540 / 2f, 0);
 		batch.setProjectionMatrix(camera.combined);
+
 		batch.begin();
 		batch.draw(sceneTexture,0,0);
 		batch.draw(hudTexture,0,475,400,80);
@@ -327,10 +345,18 @@ public class BrickBreak extends ApplicationAdapter {Sound levelSound;
 
 	@Override
 	public void dispose () {
-		batch.dispose();
-		sceneTexture.dispose();
 		verticalWallTexture.dispose();
 		horizontalWallTexture.dispose();
+		ballTexture.dispose();
+		plateTexture.dispose();
+		brickTexture.dispose();
+		hudTexture.dispose();
+		sceneTexture.dispose();
+		flakeTexture.dispose();
+		levelSound.dispose();
+		levelFont.dispose();
+		scoreFont.dispose();
+		lifeFont.dispose();
 	}
 
 	InputProcessor ip = new InputProcessor() {
@@ -354,6 +380,7 @@ public class BrickBreak extends ApplicationAdapter {Sound levelSound;
 
 		@Override
 		public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+
 			return false;
 		}
 
@@ -369,8 +396,9 @@ public class BrickBreak extends ApplicationAdapter {Sound levelSound;
 
 		@Override
 		public boolean touchDragged(int screenX, int screenY, int pointer) {
-			float x = screenX/4f-player.getWidth()/2;
-			player.setPosition(x,player.getY());
+			Vector3 touch = new Vector3(screenX, screenY, 0);
+			camera.unproject(touch);
+			player.setPosition(touch.x - player.getWidth() / 2, player.getY());
 			return true;
 		}
 
